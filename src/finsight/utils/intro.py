@@ -10,7 +10,7 @@ def print_intro():
     
     # Welcome box with light blue border
     box_width = 50
-    welcome_text = "Welcome to Dexter"
+    welcome_text = "Welcome to Finsight"
     padding = (box_width - len(welcome_text) - 2) // 2
     
     print(f"{LIGHT_BLUE}{'═' * box_width}{RESET}")
@@ -26,9 +26,9 @@ RESET = "\033[0m"
 # ASCII art for FINSIGHT
 finsight_art = f"""{BOLD}{LIGHT_BLUE}
 ███████╗██╗███╗   ██╗███████╗██╗ ██████╗ ██╗  ██╗████████╗
-██╔════╝██║████╗  ██║██╔════╝██║██╔═══██╗██║ ██╔╝╚══██╔══╝
-█████╗  ██║██╔██╗ ██║█████╗  ██║██║   ██║█████╔╝    ██║   
-██╔══╝  ██║██║╚██╗██║██╔══╝  ██║██║   ██║██╔═██╗    ██║   
+██╔════╝██║████╗  ██║██╔════╝██║██╔═══██╗██║  ██║╚══██╔══╝
+█████╗  ██║██╔██╗ ██║███████╗██║██║   ██║█████╔╝    ██║   
+██╔══╝  ██║██║╚██╗██║██╔════╝██║██║   ██║██╔═██╗    ██║   
 ██║     ██║██║ ╚████║██║     ██║╚██████╔╝██║  ██╗   ██║   
 ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
 
@@ -38,7 +38,7 @@ print(finsight_art)
 
     
 print()
-print("Your AI assistant for financial analysis.")
+print("Your AI assistant for financial analysis and visualisation.")
 print("Ask me any questions. Type 'exit' or 'quit' to end.")
 print()
 
