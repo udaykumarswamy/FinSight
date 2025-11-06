@@ -1,8 +1,8 @@
 from typing import List
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage,HumanMessage
 
-from finsight.model import call_llm 
+from finsight.model import ConversationHistory, call_llm 
 
 from finsight.prompts import (
     ACTION_SYSTEM_PROMPT,
@@ -23,6 +23,8 @@ class Agent:
         self.logger = Logger()
         self.max_steps = max_steps            # global safety cap
         self.max_steps_per_task = max_steps_per_task
+        self.conversation_history = ConversationHistory()
+        self.tools = TOOLS
 
     # ---------- task planning ----------
     @show_progress("Planning tasks...", "Tasks planned")
@@ -35,7 +37,12 @@ class Agent:
         """
         system_prompt = PLANNING_SYSTEM_PROMPT.format(tools=tool_descriptions)
         try:
-            response = call_llm(prompt, system_prompt=system_prompt, output_schema=TaskList)
+            #response = call_llm(prompt, system_prompt=system_prompt, output_schema=TaskList)
+            response = call_llm(
+            prompt=query,
+            history=self.conversation_history,  # Pass conversation history
+            tools=self.tools
+        )
             tasks = response.tasks
         except Exception as e:
             self.logger._log(f"Planning failed: {e}")
@@ -49,14 +56,28 @@ class Agent:
     @show_progress("Thinking...", "")
     def ask_for_actions(self, task_desc: str, last_outputs: str = "") -> AIMessage:
         # last_outputs = textual feedback of what we just tried
+        recent_context = "\n".join([
+            f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}" 
+            for msg in self.conversation_history.get_recent_messages(3)
+        ])
+        
+       
         prompt = f"""
-        We are working on: "{task_desc}".
-        Here is a history of tool outputs from the session so far: {last_outputs}
+        Previous conversation:
+        {recent_context}
+        
+        Current task: "{task_desc}"
+        History of tool outputs: {last_outputs}
 
-        Based on the task and the outputs, what should be the next step?
+        Based on the context and task, what should be the next step?
         """
         try:
-            return call_llm(prompt, system_prompt=ACTION_SYSTEM_PROMPT, tools=TOOLS)
+            return call_llm(
+                prompt=prompt, 
+                system_prompt=ACTION_SYSTEM_PROMPT, 
+                tools=self.tools,
+                history=self.conversation_history
+            )
         except Exception as e:
             self.logger._log(f"ask_for_actions failed: {e}")
             return AIMessage(content="Failed to get actions.")
@@ -205,7 +226,7 @@ class Agent:
                     self.logger.log_task_done(task.description)
                     break
 
-                # Process each tool call returned by the LLM.
+                # Execute each tool call suggested by the LLM.
                 for tool_call in ai_message.tool_calls:
                     if step_count >= self.max_steps:
                         break
@@ -219,33 +240,33 @@ class Agent:
                     # Create a signature of the action to be taken.
                     action_sig = f"{tool_name}:{optimized_args}"
 
-                    # Detect and prevent repetitive action loops.
-                    last_actions.append(action_sig)
-                    if len(last_actions) > 4:
-                        last_actions = last_actions[-4:]
-                    if len(set(last_actions)) == 1 and len(last_actions) == 4:
-                        self.logger._log("Detected repeating action — aborting to avoid loop.")
-                        return
-                    
-                    # Execute the tool.
+                    # Execute the tool and store result
                     tool_to_run = next((t for t in TOOLS if t.name == tool_name), None)
                     if tool_to_run and self.confirm_action(tool_name, str(optimized_args)):
                         try:
                             result = self._execute_tool(tool_to_run, tool_name, optimized_args)
+                            # Update the tool_call with the result
+                            tool_call["function"] = {"output": str(result)}
+                            
                             self.logger.log_tool_run(optimized_args, result)
                             output = f"Output of {tool_name} with args {optimized_args}: {result}"
                             task_outputs.append(output)
                             task_step_outputs.append(output)
                         except Exception as e:
+                            error_msg = f"Error from {tool_name} with args {optimized_args}: {e}"
+                            tool_call["function"] = {"output": error_msg}
                             self.logger._log(f"Tool execution failed: {e}")
-                            error_output = f"Error from {tool_name} with args {optimized_args}: {e}"
-                            task_outputs.append(error_output)
-                            task_step_outputs.append(error_output)
+                            task_outputs.append(error_msg)
+                            task_step_outputs.append(error_msg)
                     else:
                         self.logger._log(f"Invalid tool: {tool_name}")
+                        tool_call["function"] = {"output": f"Invalid tool: {tool_name}"}
 
                     step_count += 1
                     per_task_steps += 1
+                
+                # Add the AI message with tool calls to conversation history
+                self.conversation_history.add_ai_message(ai_message)
 
                 # Task-level introspection: Check if the task is complete.
                 if self.ask_if_done(task.description, "\n".join(task_step_outputs)):
@@ -268,14 +289,32 @@ class Agent:
     def _generate_answer(self, query: str, task_outputs: list) -> str:
         """Generate the final answer based on collected data."""
         all_results = "\n\n".join(task_outputs) if task_outputs else "No data was collected."
-        answer_prompt = f"""
-        Original user query: "{query}"
         
-        Data and results collected from finsight.tools:
+        # Include relevant conversation history
+        recent_context = "\n".join([
+            f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}" 
+            for msg in self.conversation_history.get_recent_messages(3)
+        ])
+        
+        
+        
+        answer_prompt = f"""
+        Previous conversation:
+        {recent_context}
+        
+        Current query: "{query}"
+        
+        Data and results collected:
         {all_results}
         
-        Based on the data above, provide a comprehensive answer to the user's query.
+        Based on the conversation history and data above, provide a comprehensive answer to the user's query.
         Include specific numbers, calculations, and insights.
+        Reference previous context when relevant.
         """
-        answer_obj = call_llm(answer_prompt, system_prompt=get_answer_system_prompt(), output_schema=Answer)
+        answer_obj = call_llm(
+            answer_prompt, 
+            system_prompt=get_answer_system_prompt(), 
+            output_schema=Answer,
+            history=self.conversation_history
+        )
         return answer_obj.answer
