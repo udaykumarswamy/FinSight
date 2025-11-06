@@ -17,7 +17,7 @@ class Colors:
     BOLD = "\033[1m"
     DIM = "\033[2m"
     WHITE = "\033[97m"
-    LIGHT_BLUE = "\033[94m"  # Same as DEXTER ASCII art
+    LIGHT_BLUE = "\033[94m"  
 
 
 class Spinner:
