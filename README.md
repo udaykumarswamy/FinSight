@@ -87,13 +87,18 @@ Supports:
 git clone https://github.com/udaykumarswamy/finsight.git
 cd finsight
 uv sync
-uv pip install -e r.
+uv pip install -e .
 ```
 
-Set environment variables:
+create .env file:
 
 ```bash
-export OPENAI_API_KEY="your_api_key"
+# Copy the example environment file
+cp env.example .env
+
+# Edit .env and add your API keys
+# OPENAI_API_KEY=your-openai-api-key
+# FINANCIAL_DATASETS_API_KEY=your-financial-datasets-api-key
 ```
 
 ---
@@ -112,7 +117,7 @@ uv run finsight-agnet
 * ✅ Tool calling
 * ✅ Memory summarization
 * 🚧 Live market data tools
-* 🚧 Semantic memory
+* 🚧 Visuals
 * 🚧 UI dashboard
 * 🚧 Advanced autonomous research workflow
 
