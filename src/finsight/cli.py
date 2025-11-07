@@ -20,13 +20,13 @@ def main():
           # Prompt the user for input
           query = session.prompt(">> ")
           if query.lower() in ["exit", "quit"]:
-              print("Goodbye!")
+              print("Goodbye! I hope to see you again soon.")
               break
           if query:
               # Run the agent
               agent.run(query)
         except (KeyboardInterrupt, EOFError):
-            print("\nGoodbye!")
+            print("\nGoodbye! I hope to see you again soon.")
             break
 
 
