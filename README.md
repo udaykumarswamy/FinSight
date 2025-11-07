@@ -1,4 +1,4 @@
-# FinSight
+# FinSight.
 
 FinSight is an AI-powered financial research agent designed to analyze markets, surface insights, and assist investors and analysts in making informed decisions. It integrates state-of-the-art LLMs and financial tools to deliver deep research, automated workflows, and contextual intelligence.
 
