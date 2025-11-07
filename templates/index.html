@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FinSight - AI Financial Research Agent</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -107,6 +108,29 @@
 
         .submit-btn:disabled {
             opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            padding: 10px 20px;
+            background: #f5f5f5;
+            color: #666;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .clear-btn:hover:not(:disabled) {
+            background: #eeeeee;
+            border-color: #ccc;
+        }
+
+        .clear-btn:disabled {
+            opacity: 0.5;
             cursor: not-allowed;
         }
 
@@ -251,6 +275,19 @@
             color: #333;
         }
 
+        .chart-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            max-width: 100%;
+        }
+
+        .chart-container canvas {
+            max-height: 400px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -322,7 +359,10 @@
                         placeholder="Ask me anything about financial markets, stocks, companies, or economic data..."
                         rows="2"
                     ></textarea>
-                    <button id="submitBtn" class="submit-btn">Send</button>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button id="submitBtn" class="submit-btn">Send</button>
+                        <button id="clearBtn" class="clear-btn" title="Clear conversation history">Clear</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -331,12 +371,21 @@
     <script>
         const queryInput = document.getElementById('queryInput');
         const submitBtn = document.getElementById('submitBtn');
+        const clearBtn = document.getElementById('clearBtn');
         const outputContent = document.getElementById('outputContent');
 
         let currentQueryId = null;
         let eventSource = null;
         let conversationHistory = [];
         let currentStatusIndicator = null;
+        let pendingChartData = null; // Store chart data to attach to next answer
+        
+        // Generate or retrieve session ID for maintaining conversation context
+        let sessionId = localStorage.getItem('finsight_session_id');
+        if (!sessionId) {
+            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('finsight_session_id', sessionId);
+        }
 
         function clearOutput() {
             outputContent.innerHTML = '';
@@ -392,15 +441,15 @@
             outputSection.scrollTop = outputSection.scrollHeight;
         }
 
-        function addAnswer(answer) {
+        function addAnswer(answer, chartData = null) {
             // Remove empty state if it exists
             const emptyState = outputContent.querySelector('.empty-state');
             if (emptyState) {
                 emptyState.remove();
             }
             
-            // Add as conversation item instead of separate answer box
-            addConversationItem('assistant', answer);
+            // Add as conversation item with optional chart
+            addConversationItem('assistant', answer, chartData);
         }
 
         function addError(message) {
@@ -420,7 +469,7 @@
             outputSection.scrollTop = outputSection.scrollHeight;
         }
 
-        function addConversationItem(role, content) {
+        function addConversationItem(role, content, chartData = null) {
             // Remove empty state if it exists
             const emptyState = outputContent.querySelector('.empty-state');
             if (emptyState) {
@@ -429,14 +478,154 @@
             
             const item = document.createElement('div');
             item.className = `conversation-item ${role}`;
-            item.innerHTML = `
+            
+            let contentHtml = `
                 <div class="label">${role === 'user' ? 'You' : 'Agent'}:</div>
                 <div class="content">${content}</div>
             `;
-            outputContent.appendChild(item);
+            
+            // Add chart if data is available
+            if (chartData) {
+                const chartId = 'chart_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                contentHtml += `<div class="chart-container"><canvas id="${chartId}"></canvas></div>`;
+                item.innerHTML = contentHtml;
+                outputContent.appendChild(item);
+                
+                // Render chart after a small delay to ensure DOM is ready
+                setTimeout(() => {
+                    renderChart(chartId, chartData);
+                }, 100);
+            } else {
+                item.innerHTML = contentHtml;
+                outputContent.appendChild(item);
+            }
+            
             // Scroll to bottom
             const outputSection = outputContent.parentElement;
             outputSection.scrollTop = outputSection.scrollHeight;
+        }
+
+        function renderChart(canvasId, chartData) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Determine chart type based on data
+            const isTimeSeries = chartData.interval && ['minute', 'hour', 'day', 'quarter', 'year'].includes(chartData.interval);
+            const chartType = isTimeSeries ? 'line' : 'bar';
+            
+            // Prepare data
+            const labels = chartData.labels || [];
+            const values = chartData.values || [];
+            
+            // Chart configuration
+            const config = {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: chartData.y_label || 'Value',
+                        data: values,
+                        borderColor: chartData.interval ? '#667eea' : '#2196f3',
+                        backgroundColor: chartData.interval ? 'rgba(102, 126, 234, 0.1)' : 'rgba(33, 150, 243, 0.2)',
+                        borderWidth: 2,
+                        fill: chartType === 'line',
+                        tension: chartType === 'line' ? 0.4 : 0,
+                        pointRadius: chartType === 'line' ? 3 : 0,
+                        pointHoverRadius: chartType === 'line' ? 5 : 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: chartData.title || 'Chart',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                top: 10,
+                                bottom: 20
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    const value = context.parsed.y;
+                                    // Format value based on type
+                                    if (chartData.y_label && chartData.y_label.includes('$B')) {
+                                        label += '$' + (value / 1e9).toFixed(2) + 'B';
+                                    } else if (chartData.y_label && chartData.y_label.includes('$')) {
+                                        label += '$' + value.toFixed(2);
+                                    } else {
+                                        label += value.toFixed(2);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: chartType === 'line' ? {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: chartData.x_label || 'X Axis'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: chartData.y_label || 'Y Axis'
+                            },
+                            beginAtZero: false
+                        }
+                    } : {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: chartData.x_label || 'X Axis'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: chartData.y_label || 'Y Axis'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            };
+            
+            new Chart(ctx, config);
         }
 
         function startStreaming(queryId) {
@@ -455,12 +644,18 @@
                     addStatusIndicator(data.message, true);
                 } else if (data.type === 'log') {
                     addLogMessage(data.message);
+                } else if (data.type === 'plot') {
+                    // Store chart data to attach to the next answer
+                    pendingChartData = data.data;
                 } else if (data.type === 'answer') {
                     // Remove status indicator when answer arrives
                     removeStatusIndicator();
-                    addAnswer(data.data);
+                    // Add answer with chart if available
+                    addAnswer(data.data, pendingChartData);
                     // Add to conversation history
                     conversationHistory.push({ role: 'assistant', content: data.data });
+                    // Clear pending chart data
+                    pendingChartData = null;
                 } else if (data.type === 'error') {
                     // Remove status indicator on error
                     removeStatusIndicator();
@@ -521,7 +716,10 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ query }),
+                    body: JSON.stringify({ 
+                        query: queryText,
+                        session_id: sessionId 
+                    }),
                 });
 
                 const data = await response.json();
@@ -531,6 +729,12 @@
                     submitBtn.disabled = false;
                     queryInput.disabled = false;
                     return;
+                }
+
+                // Update session_id if server returned a new one
+                if (data.session_id && data.session_id !== sessionId) {
+                    sessionId = data.session_id;
+                    localStorage.setItem('finsight_session_id', sessionId);
                 }
 
                 currentQueryId = data.query_id;
@@ -544,6 +748,42 @@
         }
 
         submitBtn.addEventListener('click', submitQuery);
+
+        clearBtn.addEventListener('click', async function() {
+            if (confirm('Clear conversation history? This will start a new session.')) {
+                // Clear session on server
+                try {
+                    await fetch('/api/clear-session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ session_id: sessionId }),
+                    });
+                } catch (error) {
+                    console.error('Error clearing session on server:', error);
+                }
+                
+                // Clear local storage session
+                localStorage.removeItem('finsight_session_id');
+                // Generate new session ID
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('finsight_session_id', sessionId);
+                // Clear UI
+                clearOutput();
+                conversationHistory = [];
+                // Show empty state
+                outputContent.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <h3>Ready to analyze</h3>
+                        <p>Enter your financial research query below to get started</p>
+                    </div>
+                `;
+            }
+        });
 
         queryInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

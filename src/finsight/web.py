@@ -32,15 +32,28 @@ templates = Jinja2Templates(directory=templates_dir)
 # Store active query queues for SSE streaming
 active_queues: dict[str, Queue] = {}
 
+# Store agent instances per session to maintain conversation context
+session_agents: dict[str, Agent] = {}
 
-def run_agent_with_streaming(query: str, query_id: str):
+
+def get_or_create_agent(session_id: str) -> Agent:
+    """Get an existing agent for a session or create a new one."""
+    if session_id not in session_agents:
+        session_agents[session_id] = Agent()
+    return session_agents[session_id]
+
+
+def run_agent_with_streaming(query: str, query_id: str, session_id: str):
     """Run the agent and stream progress updates to the queue."""
     queue = active_queues.get(query_id)
     if not queue:
         return
     
-    # Create a new agent instance for this query to avoid conflicts
-    agent = Agent()
+    # Get or create agent for this session to maintain conversation context
+    agent = get_or_create_agent(session_id)
+    
+    # Add user message to conversation history to maintain context
+    agent.conversation_history.add_user_message(query)
     
     try:
         # Send initial message
@@ -58,7 +71,20 @@ def run_agent_with_streaming(query: str, query_id: str):
         try:
             # Run the agent
             queue.put({"type": "status", "message": "Processing your query...", "data": None})
-            answer = agent.run(query)
+            result = agent.run(query)
+            
+            # Handle both old string format and new dict format
+            if isinstance(result, dict):
+                answer = result.get("answer", "")
+                plot_data = result.get("plot_data", None)
+            else:
+                # Fallback for old format (string)
+                answer = str(result)
+                plot_data = None
+            
+            # Send plot data if available
+            if plot_data:
+                queue.put({"type": "plot", "message": "Chart data available", "data": plot_data})
             
             # Send final answer
             queue.put({"type": "answer", "message": "Analysis complete!", "data": answer})
@@ -95,11 +121,16 @@ async def process_query(request: Request):
     """Process a user query and return a query ID for SSE streaming."""
     data = await request.json()
     query = data.get("query", "").strip()
+    session_id = data.get("session_id", None)
     
     if not query:
         return {"error": "Query cannot be empty", "query_id": None}
     
     import uuid
+    # Generate session_id if not provided
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    
     query_id = str(uuid.uuid4())
     queue = Queue()
     active_queues[query_id] = queue
@@ -107,12 +138,25 @@ async def process_query(request: Request):
     # Start agent in a separate thread
     thread = threading.Thread(
         target=run_agent_with_streaming,
-        args=(query, query_id),
+        args=(query, query_id, session_id),
         daemon=True
     )
     thread.start()
     
-    return {"query_id": query_id, "status": "started"}
+    return {"query_id": query_id, "session_id": session_id, "status": "started"}
+
+
+@app.post("/api/clear-session")
+async def clear_session(request: Request):
+    """Clear a session's agent and conversation history."""
+    data = await request.json()
+    session_id = data.get("session_id", None)
+    
+    if session_id and session_id in session_agents:
+        del session_agents[session_id]
+        return {"status": "cleared", "message": "Session cleared successfully"}
+    
+    return {"status": "not_found", "message": "Session not found"}
 
 
 @app.get("/api/stream/{query_id}")
