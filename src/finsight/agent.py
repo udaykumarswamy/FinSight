@@ -41,7 +41,8 @@ class Agent:
             response = call_llm(
             prompt=query,
             history=self.conversation_history,  # Pass conversation history
-            tools=self.tools
+            tools=self.tools,
+            output_schema=TaskList,
         )
             tasks = response.tasks
         except Exception as e:
