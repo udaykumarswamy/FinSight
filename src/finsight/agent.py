@@ -284,7 +284,15 @@ class Agent:
 
         # Generate the final answer from all collected tool outputs.
         answer = self._generate_answer(query, task_outputs)
-        self.logger.log_summary(answer)
+        
+        # Extract answer string for logging (handle both dict and string formats)
+        if isinstance(answer, dict):
+            answer_text = answer.get("answer", "")
+            self.logger.log_summary(answer_text)
+        else:
+            # Fallback for old string format
+            self.logger.log_summary(str(answer))
+        
         return answer
     
     # ---------- answer generation ----------
@@ -321,8 +329,11 @@ class Agent:
             history=self.conversation_history
         )
         answer = answer_obj.answer
-        plot = try_plot_from_text(answer)
-        if plot:
-            answer = f"{answer}\n\nVisualization:\n{plot}"
-            
-        return answer
+        plot_data = try_plot_from_text(answer)
+        
+        # Return answer with optional plot data
+        # The plot_data will be handled separately by the web server
+        return {
+            "answer": answer,
+            "plot_data": plot_data
+        }

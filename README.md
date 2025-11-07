@@ -23,6 +23,7 @@ This project was developed by Uday Kumar Swamy, under the guidance of Professor 
 * **Python**
 * **LangChain** (agents, memory, tool execution)
 * **OpenAI GPT models**
+* **FastAPI** (web server for UI)
 * **tiktoken** for token management
 * **Pydantic** for structured outputs
 * **Custom tool integrations** for financial data
@@ -105,9 +106,35 @@ cp env.example .env
 
 ## ▶️ Usage
 
+### Command Line Interface
+
 ```bash
-uv run finsight-agnet
+uv run finsight-agent
 ```
+
+### Web UI
+
+Start the web interface:
+
+```bash
+# Using uv
+uv run python -m finsight.web
+
+# Or using the entry point (after installation)
+finsight-web
+
+# Or using the startup script
+chmod +x start_web.sh
+./start_web.sh
+```
+
+Then open your browser and navigate to `http://localhost:8000`
+
+The web UI provides:
+- ✨ Modern, responsive interface
+- 🔄 Real-time progress updates
+- 💬 Interactive conversation history
+- 📊 Formatted answer display
 
 ---
 
@@ -116,9 +143,9 @@ uv run finsight-agnet
 * ✅ Core agent
 * ✅ Tool calling
 * ✅ Memory summarization
+* ✅ Web UI dashboard
 * 🚧 Live market data tools
 * 🚧 Visuals
-* 🚧 UI dashboard
 * 🚧 Advanced autonomous research workflow
 
 ## Feature Improvment 
