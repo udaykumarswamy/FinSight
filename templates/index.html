@@ -57,9 +57,10 @@
         }
 
         .input-section {
-            padding: 30px;
-            border-bottom: 2px solid #f0f0f0;
+            padding: 20px 30px;
+            border-top: 2px solid #f0f0f0;
             background: #fafafa;
+            flex-shrink: 0;
         }
 
         .input-container {
@@ -111,24 +112,30 @@
 
         .output-section {
             flex: 1;
-            padding: 30px;
+            padding: 20px 30px;
             overflow-y: auto;
             background: #ffffff;
+            display: flex;
+            flex-direction: column;
         }
 
         .output-content {
-            min-height: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .status-indicator {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 10px 20px;
+            padding: 12px 20px;
             background: #f0f0f0;
             border-radius: 8px;
-            margin-bottom: 20px;
             font-size: 14px;
+            align-self: flex-start;
+            max-width: 85%;
         }
 
         .status-indicator.active {
@@ -152,31 +159,35 @@
         .answer-box {
             background: #f8f9fa;
             border-left: 4px solid #667eea;
-            padding: 25px;
+            padding: 20px;
             border-radius: 8px;
-            margin-top: 20px;
             white-space: pre-wrap;
             line-height: 1.8;
             font-size: 15px;
+            align-self: flex-start;
+            max-width: 85%;
         }
 
         .log-message {
             padding: 8px 12px;
-            margin: 5px 0;
             background: #f5f5f5;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
             color: #666;
             font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            align-self: flex-start;
+            max-width: 85%;
+            margin-top: 5px;
         }
 
         .error-message {
             background: #ffebee;
             color: #c62828;
             border-left: 4px solid #c62828;
-            padding: 15px;
+            padding: 15px 20px;
             border-radius: 8px;
-            margin-top: 20px;
+            align-self: flex-start;
+            max-width: 85%;
         }
 
         .conversation-history {
@@ -184,38 +195,67 @@
         }
 
         .conversation-item {
-            margin-bottom: 20px;
-            padding: 15px;
+            padding: 15px 20px;
             border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .conversation-item.user {
             background: #e3f2fd;
             border-left: 4px solid #2196f3;
+            align-self: flex-end;
+            max-width: 85%;
+            margin-left: auto;
         }
 
         .conversation-item.assistant {
-            background: #f1f8e9;
-            border-left: 4px solid #8bc34a;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            align-self: flex-start;
+            max-width: 85%;
+            margin-right: auto;
         }
 
         .conversation-item .label {
-            font-weight: 600;
-            margin-bottom: 8px;
-            font-size: 12px;
-            text-transform: uppercase;
-            color: #666;
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .conversation-item.user .label {
+            color: #1976d2;
+        }
+
+        .conversation-item.assistant .label {
+            color: #667eea;
         }
 
         .conversation-item .content {
             white-space: pre-wrap;
-            line-height: 1.6;
+            line-height: 1.8;
+            font-size: 15px;
+            color: #333;
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
             color: #999;
+            margin: auto;
         }
 
         .empty-state svg {
@@ -262,18 +302,6 @@
         </div>
 
         <div class="main-content">
-            <div class="input-section">
-                <div class="input-container">
-                    <textarea 
-                        id="queryInput" 
-                        class="input-field" 
-                        placeholder="Ask me anything about financial markets, stocks, companies, or economic data..."
-                        rows="3"
-                    ></textarea>
-                    <button id="submitBtn" class="submit-btn">Analyze</button>
-                </div>
-            </div>
-
             <div class="output-section">
                 <div id="outputContent" class="output-content">
                     <div class="empty-state">
@@ -281,8 +309,20 @@
                             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                         <h3>Ready to analyze</h3>
-                        <p>Enter your financial research query above to get started</p>
+                        <p>Enter your financial research query below to get started</p>
                     </div>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <div class="input-container">
+                    <textarea 
+                        id="queryInput" 
+                        class="input-field" 
+                        placeholder="Ask me anything about financial markets, stocks, companies, or economic data..."
+                        rows="2"
+                    ></textarea>
+                    <button id="submitBtn" class="submit-btn">Send</button>
                 </div>
             </div>
         </div>
@@ -296,12 +336,30 @@
         let currentQueryId = null;
         let eventSource = null;
         let conversationHistory = [];
+        let currentStatusIndicator = null;
 
         function clearOutput() {
             outputContent.innerHTML = '';
+            currentStatusIndicator = null;
+        }
+
+        function removeStatusIndicator() {
+            if (currentStatusIndicator && currentStatusIndicator.parentNode) {
+                currentStatusIndicator.parentNode.removeChild(currentStatusIndicator);
+                currentStatusIndicator = null;
+            }
         }
 
         function addStatusIndicator(message, isActive = false) {
+            // Remove any existing status indicator first
+            removeStatusIndicator();
+            
+            // Remove empty state if it exists
+            const emptyState = outputContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
             const indicator = document.createElement('div');
             indicator.className = `status-indicator ${isActive ? 'active' : ''}`;
             if (isActive) {
@@ -310,41 +368,75 @@
                 indicator.textContent = message;
             }
             outputContent.appendChild(indicator);
+            currentStatusIndicator = indicator;
+            
+            // Scroll to bottom
+            const outputSection = outputContent.parentElement;
+            outputSection.scrollTop = outputSection.scrollHeight;
         }
 
         function addLogMessage(message) {
+            // Remove empty state if it exists
+            const emptyState = outputContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
             const logDiv = document.createElement('div');
             logDiv.className = 'log-message';
             logDiv.textContent = message;
             outputContent.appendChild(logDiv);
-            outputContent.scrollTop = outputContent.scrollHeight;
+            
+            // Scroll to bottom
+            const outputSection = outputContent.parentElement;
+            outputSection.scrollTop = outputSection.scrollHeight;
         }
 
         function addAnswer(answer) {
-            const answerDiv = document.createElement('div');
-            answerDiv.className = 'answer-box';
-            answerDiv.textContent = answer;
-            outputContent.appendChild(answerDiv);
-            outputContent.scrollTop = outputContent.scrollHeight;
+            // Remove empty state if it exists
+            const emptyState = outputContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            // Add as conversation item instead of separate answer box
+            addConversationItem('assistant', answer);
         }
 
         function addError(message) {
+            // Remove empty state if it exists
+            const emptyState = outputContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error-message';
             errorDiv.textContent = message;
             outputContent.appendChild(errorDiv);
-            outputContent.scrollTop = outputContent.scrollHeight;
+            
+            // Scroll to bottom
+            const outputSection = outputContent.parentElement;
+            outputSection.scrollTop = outputSection.scrollHeight;
         }
 
         function addConversationItem(role, content) {
+            // Remove empty state if it exists
+            const emptyState = outputContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
             const item = document.createElement('div');
             item.className = `conversation-item ${role}`;
             item.innerHTML = `
-                <div class="label">${role === 'user' ? 'You' : 'FinSight'}</div>
+                <div class="label">${role === 'user' ? 'You' : 'Agent'}:</div>
                 <div class="content">${content}</div>
             `;
             outputContent.appendChild(item);
-            outputContent.scrollTop = outputContent.scrollHeight;
+            // Scroll to bottom
+            const outputSection = outputContent.parentElement;
+            outputSection.scrollTop = outputSection.scrollHeight;
         }
 
         function startStreaming(queryId) {
@@ -358,21 +450,32 @@
                 const data = JSON.parse(event.data);
                 
                 if (data.type === 'status') {
-                    clearOutput();
+                    // Just update the status indicator, don't clear output
+                    // (conversation history should be preserved)
                     addStatusIndicator(data.message, true);
                 } else if (data.type === 'log') {
                     addLogMessage(data.message);
                 } else if (data.type === 'answer') {
+                    // Remove status indicator when answer arrives
+                    removeStatusIndicator();
                     addAnswer(data.data);
+                    // Add to conversation history
+                    conversationHistory.push({ role: 'assistant', content: data.data });
                 } else if (data.type === 'error') {
+                    // Remove status indicator on error
+                    removeStatusIndicator();
                     addError(data.message);
                 } else if (data.type === 'done') {
+                    // Remove status indicator when done
+                    removeStatusIndicator();
                     if (eventSource) {
                         eventSource.close();
                         eventSource = null;
                     }
                     submitBtn.disabled = false;
                     queryInput.disabled = false;
+                    // Focus input for next query
+                    queryInput.focus();
                 }
             };
 
@@ -395,17 +498,22 @@
                 return;
             }
 
+            // Store the query before clearing
+            const queryText = query;
+            
             // Disable input and button
             submitBtn.disabled = true;
             queryInput.disabled = true;
-
-            // Clear previous output
-            clearOutput();
-            addStatusIndicator('Sending query...', true);
-
-            // Add user query to conversation
-            addConversationItem('user', query);
-            conversationHistory.push({ role: 'user', content: query });
+            
+            // Add user query to conversation first
+            addConversationItem('user', queryText);
+            conversationHistory.push({ role: 'user', content: queryText });
+            
+            // Clear input field after adding to conversation
+            queryInput.value = '';
+            
+            // Then add status indicator
+            addStatusIndicator('Processing your request...', true);
 
             try {
                 const response = await fetch('/api/query', {
@@ -441,6 +549,10 @@
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 submitQuery();
+            } else if (e.key === 'Enter' && !e.shiftKey && !submitBtn.disabled) {
+                // Submit on Enter (but allow Shift+Enter for new line)
+                e.preventDefault();
+                submitQuery();
             }
         });
 
@@ -449,4 +561,5 @@
     </script>
 </body>
 </html>
+
 
