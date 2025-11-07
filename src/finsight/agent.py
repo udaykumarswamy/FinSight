@@ -1,7 +1,7 @@
 from typing import List
 
 from langchain_core.messages import AIMessage,HumanMessage
-
+from finsight.plotgraph import try_plot_from_text
 from finsight.model import ConversationHistory, call_llm 
 
 from finsight.prompts import (
@@ -164,6 +164,8 @@ class Agent:
         # In production you'd ask the user; here we just log and auto-confirm
         # Risky tools are not implemented in this version.
         return True
+    
+   
 
     # ---------- main loop ----------
     def run(self, query: str):
@@ -318,4 +320,9 @@ class Agent:
             output_schema=Answer,
             history=self.conversation_history
         )
-        return answer_obj.answer
+        answer = answer_obj.answer
+        plot = try_plot_from_text(answer)
+        if plot:
+            answer = f"{answer}\n\nVisualization:\n{plot}"
+            
+        return answer
