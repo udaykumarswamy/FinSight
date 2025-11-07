@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSight - AI Financial Research Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .input-section {
+            padding: 30px;
+            border-bottom: 2px solid #f0f0f0;
+            background: #fafafa;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .submit-btn {
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .output-section {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #ffffff;
+        }
+
+        .output-content {
+            min-height: 100%;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status-indicator.active {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .answer-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 25px;
+            border-radius: 8px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            font-size: 15px;
+        }
+
+        .log-message {
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #666;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .conversation-history {
+            margin-top: 30px;
+        }
+
+        .conversation-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .conversation-item.user {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+
+        .conversation-item.assistant {
+            background: #f1f8e9;
+            border-left: 4px solid #8bc34a;
+        }
+
+        .conversation-item .label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        .conversation-item .content {
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        .empty-state p {
+            font-size: 1em;
+        }
+
+        /* Scrollbar styling */
+        .output-section::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .output-section::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .output-section::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 FinSight</h1>
+            <p>AI-Powered Financial Research Agent</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-section">
+                <div class="input-container">
+                    <textarea 
+                        id="queryInput" 
+                        class="input-field" 
+                        placeholder="Ask me anything about financial markets, stocks, companies, or economic data..."
+                        rows="3"
+                    ></textarea>
+                    <button id="submitBtn" class="submit-btn">Analyze</button>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <div id="outputContent" class="output-content">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <h3>Ready to analyze</h3>
+                        <p>Enter your financial research query above to get started</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const queryInput = document.getElementById('queryInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const outputContent = document.getElementById('outputContent');
+
+        let currentQueryId = null;
+        let eventSource = null;
+        let conversationHistory = [];
+
+        function clearOutput() {
+            outputContent.innerHTML = '';
+        }
+
+        function addStatusIndicator(message, isActive = false) {
+            const indicator = document.createElement('div');
+            indicator.className = `status-indicator ${isActive ? 'active' : ''}`;
+            if (isActive) {
+                indicator.innerHTML = `<div class="spinner"></div><span>${message}</span>`;
+            } else {
+                indicator.textContent = message;
+            }
+            outputContent.appendChild(indicator);
+        }
+
+        function addLogMessage(message) {
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-message';
+            logDiv.textContent = message;
+            outputContent.appendChild(logDiv);
+            outputContent.scrollTop = outputContent.scrollHeight;
+        }
+
+        function addAnswer(answer) {
+            const answerDiv = document.createElement('div');
+            answerDiv.className = 'answer-box';
+            answerDiv.textContent = answer;
+            outputContent.appendChild(answerDiv);
+            outputContent.scrollTop = outputContent.scrollHeight;
+        }
+
+        function addError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            outputContent.appendChild(errorDiv);
+            outputContent.scrollTop = outputContent.scrollHeight;
+        }
+
+        function addConversationItem(role, content) {
+            const item = document.createElement('div');
+            item.className = `conversation-item ${role}`;
+            item.innerHTML = `
+                <div class="label">${role === 'user' ? 'You' : 'FinSight'}</div>
+                <div class="content">${content}</div>
+            `;
+            outputContent.appendChild(item);
+            outputContent.scrollTop = outputContent.scrollHeight;
+        }
+
+        function startStreaming(queryId) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource(`/api/stream/${queryId}`);
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'status') {
+                    clearOutput();
+                    addStatusIndicator(data.message, true);
+                } else if (data.type === 'log') {
+                    addLogMessage(data.message);
+                } else if (data.type === 'answer') {
+                    addAnswer(data.data);
+                } else if (data.type === 'error') {
+                    addError(data.message);
+                } else if (data.type === 'done') {
+                    if (eventSource) {
+                        eventSource.close();
+                        eventSource = null;
+                    }
+                    submitBtn.disabled = false;
+                    queryInput.disabled = false;
+                }
+            };
+
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                submitBtn.disabled = false;
+                queryInput.disabled = false;
+            };
+        }
+
+        async function submitQuery() {
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+
+            // Disable input and button
+            submitBtn.disabled = true;
+            queryInput.disabled = true;
+
+            // Clear previous output
+            clearOutput();
+            addStatusIndicator('Sending query...', true);
+
+            // Add user query to conversation
+            addConversationItem('user', query);
+            conversationHistory.push({ role: 'user', content: query });
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query }),
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    addError(data.error);
+                    submitBtn.disabled = false;
+                    queryInput.disabled = false;
+                    return;
+                }
+
+                currentQueryId = data.query_id;
+                startStreaming(currentQueryId);
+
+            } catch (error) {
+                addError(`Failed to submit query: ${error.message}`);
+                submitBtn.disabled = false;
+                queryInput.disabled = false;
+            }
+        }
+
+        submitBtn.addEventListener('click', submitQuery);
+
+        queryInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                submitQuery();
+            }
+        });
+
+        // Focus input on load
+        queryInput.focus();
+    </script>
+</body>
+</html>
+
